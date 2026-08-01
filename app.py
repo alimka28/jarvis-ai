@@ -13,11 +13,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🤖 СИСТЕМА ДЖАРВИС v3.4")
+st.title("🤖 СИСТЕМА ДЖАРВИС v3.5")
 
 with st.sidebar:
     st.header("🔑 ТЕРМИНАЛ")
-    # Используй strip() чтобы убрать случайные пробелы при вставке
+    # Тщательно проверяем имена переменных!
     g_key = st.text_input("Google API Key:", type="password")
     t_key = st.text_input("Tavily API Key:", type="password")
 
@@ -25,14 +25,13 @@ mode = st.radio("РЕЖИМ:", ["🔍 OSINT (Поиск)", "🎭 RP Mode (Выд
 user_query = st.text_area("ЗАПРОС:")
 
 if st.button("ЗАПУСТИТЬ ПРОЦЕССОР"):
-    if not g_key or not t_key:
-        st.error("Ошибка: Введите ОБА ключа (Google и Tavily)")
+    # Проверка, что оба поля заполнены
+    if not g_key.strip() or not t_key.strip():
+        st.error("Ошибка: Введите ОБА ключа в боковой панели!")
     else:
         try:
             # Настраиваем Google
             genai.configure(api_key=g_key.strip())
-            
-            # Используем САМУЮ проверенную модель. Без вариантов.
             model = genai.GenerativeModel('gemini-1.5-flash')
 
             if mode == "🎭 RP Mode (Выдумка)":
@@ -41,10 +40,13 @@ if st.button("ЗАПУСТИТЬ ПРОЦЕССОР"):
                     st.markdown(res.text)
             else:
                 with st.spinner("Джарвис сканирует интернет..."):
-                    tavily = TavilyClient(api_key=tavily_key.strip())
+                    # Исправлено: теперь используем t_key, который определен выше
+                    tavily = TavilyClient(api_key=t_key.strip())
                     search = tavily.search(query=user_query, search_depth="advanced")
-                    res = model.generate_content(f"Данные из интернета: {search}. Проанализируй связи для: {user_query}. Учти законы Украины.")
+                    
+                    prompt = f"Данные из интернета: {search}. Проанализируй связи для: {user_query}. Учти законы Украины."
+                    res = model.generate_content(prompt)
                     st.markdown(res.text)
                         
         except Exception as e:
-            st.error(f"❌ СБОЙ: {str(e)}")
+            st.error(f"❌ СБОЙ СИСТЕМЫ: {str(e)}")
