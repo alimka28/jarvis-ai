@@ -1,41 +1,63 @@
 import streamlit as st
-import google.generativeai as genai
+from openai import OpenAI
 from tavily import TavilyClient
 
-st.title("🤖 JARVIS v4.0 (Easy Mode)")
+st.set_page_config(page_title="JARVIS v4.0", page_icon="🤖", layout="wide")
 
-# Упрощаем ввод: всё в одной колонке
-g_key = st.text_input("Вставь Google Key:", type="password")
-t_key = st.text_input("Вставь Tavily Key (необязательно):", type="password")
-query = st.text_area("Твой вопрос:")
+st.title("🤖 JARVIS: OPENROUTER EDITION")
 
-if st.button("ЗАПУСК"):
-    if not g_key:
-        st.error("Без Google Key я не смогу думать!")
+# Настройки в боковой панели
+with st.sidebar:
+    st.header("🔑 ТЕРМИНАЛ КЛЮЧЕЙ")
+    or_key = st.text_input("OpenRouter API Key:", type="password")
+    tv_key = st.text_input("Tavily API Key:", type="password")
+    st.markdown("---")
+    st.write("Система использует OpenRouter для обхода блокировок Google.")
+
+mode = st.radio("РЕЖИМ:", ["🔍 OSINT (Поиск)", "🎭 RP Mode (Выдумка)"], horizontal=True)
+user_query = st.text_input("ВАШ ЗАПРОС:")
+
+if st.button("ВЫПОЛНИТЬ"):
+    if not or_key:
+        st.error("Введите OpenRouter Key!")
     else:
         try:
-            genai.configure(api_key=g_key.strip())
-            # Пробуем самую простую модель без лишних слов
-            model = genai.GenerativeModel('gemini-pro') 
-            
-            # Если есть ключ Tavily и запрос сложный — ищем. Иначе — просто отвечаем.
-            if t_key.strip() and len(query) > 5:
-                try:
-                    tavily = TavilyClient(api_key=t_key.strip())
-                    search = tavily.search(query=query)
-                    final_prompt = f"Данные из сети: {search}\n\nВопрос: {query}"
-                    st.info("🔍 Использовал поиск")
-                except:
-                    final_prompt = query
-                    st.warning("⚠️ Поиск не сработал, отвечаю из памяти")
-            else:
-                final_prompt = query
+            # Настройка клиента OpenRouter
+            client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=or_key.strip(),
+            )
 
-            response = model.generate_content(final_prompt)
-            st.markdown(response.text)
-            
-        except Exception as e:
-            st.error(f"Бро, опять ошибка: {e}")
+            # Выбор модели (бесплатная и мощная)
+            # Можно заменить на "google/gemini-flash-1.5:free", если хочешь именно Gemini
+            selected_model = "meta-llama/llama-3.1-8b-instruct:free"
+
+            if mode == "🔍 OSINT (Поиск)":
+                if not tv_key:
+                    st.error("Нужен Tavily Key для поиска!")
+                else:
+                    with st.spinner("Джарвис сканирует сеть..."):
+                        tavily = TavilyClient(api_key=tv_key.strip())
+                        search_data = tavily.search(query=user_query, search_depth="advanced")
                         
+                        prompt = f"Данные поиска: {search_data}. Проанализируй связи для: {user_query}. Учти законы Украины."
+                        
+                        response = client.chat.completions.create(
+                            model=selected_model,
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        st.markdown(response.choices[0].message.content)
+            
+            else: # Режим RP
+                with st.spinner("Джарвис генерирует..."):
+                    prompt = f"Ты Джарвис, придумай творческое досье/историю: {user_query}"
+                    response = client.chat.completions.create(
+                        model=selected_model,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    st.markdown(response.choices[0].message.content)
+
         except Exception as e:
-            st.error(f"❌ ОШИБКА: {str(e)}")
+            st.error(f"Ошибка: {str(e)}")
+
+st.caption("Powered by OpenRouter & Tavily")
