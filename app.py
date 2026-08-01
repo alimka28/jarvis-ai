@@ -13,52 +13,38 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🤖 СИСТЕМА ДЖАРВИС v3.3")
+st.title("🤖 СИСТЕМА ДЖАРВИС v3.4")
 
 with st.sidebar:
     st.header("🔑 ТЕРМИНАЛ")
-    google_key = st.text_input("Google API Key:", type="password")
-    tavily_key = st.text_input("Tavily API Key:", type="password")
-    st.info("Введите ключи и начните работу.")
+    # Используй strip() чтобы убрать случайные пробелы при вставке
+    g_key = st.text_input("Google API Key:", type="password")
+    t_key = st.text_input("Tavily API Key:", type="password")
 
 mode = st.radio("РЕЖИМ:", ["🔍 OSINT (Поиск)", "🎭 RP Mode (Выдумка)"], horizontal=True)
 user_query = st.text_area("ЗАПРОС:")
 
 if st.button("ЗАПУСТИТЬ ПРОЦЕССОР"):
-    if not google_key:
-        st.error("Ошибка: Введите Google Key")
+    if not g_key or not t_key:
+        st.error("Ошибка: Введите ОБА ключа (Google и Tavily)")
     else:
         try:
             # Настраиваем Google
-            genai.configure(api_key=google_key.strip())
+            genai.configure(api_key=g_key.strip())
             
-            # --- ЖЕСТКИЙ ВЫБОР МОДЕЛИ ---
-            # Пробуем по очереди самые стабильные варианты
-            try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                # Тестовый микровзброс, чтобы проверить, жива ли модель
-                _ = model.generate_content("hi") 
-            except:
-                try:
-                    model = genai.GenerativeModel('gemini-1.5-pro')
-                    _ = model.generate_content("hi")
-                except:
-                    model = genai.GenerativeModel('gemini-pro')
+            # Используем САМУЮ проверенную модель. Без вариантов.
+            model = genai.GenerativeModel('gemini-1.5-flash')
 
             if mode == "🎭 RP Mode (Выдумка)":
-                with st.spinner("Джарвис генерирует..."):
+                with st.spinner("Джарвис генерирует данные..."):
                     res = model.generate_content(f"Ты Джарвис, придумай досье для RP: {user_query}")
                     st.markdown(res.text)
             else:
-                if not tavily_key:
-                    st.error("Ошибка: Нужен Tavily Key")
-                else:
-                    with st.spinner("Джарвис сканирует интернет..."):
-                        tavily = TavilyClient(api_key=tavily_key.strip())
-                        search = tavily.search(query=user_query, search_depth="advanced")
-                        res = model.generate_content(f"Данные из интернета: {search}. Проанализируй связи и события для: {user_query}. Учти законы Украины.")
-                        st.markdown(res.text)
+                with st.spinner("Джарвис сканирует интернет..."):
+                    tavily = TavilyClient(api_key=tavily_key.strip())
+                    search = tavily.search(query=user_query, search_depth="advanced")
+                    res = model.generate_content(f"Данные из интернета: {search}. Проанализируй связи для: {user_query}. Учти законы Украины.")
+                    st.markdown(res.text)
                         
         except Exception as e:
-            st.error(f"❌ ОШИБКА ДОСТУПА: {str(e)}")
-            st.warning("Если вы видите 404, ваш API-ключ не активирован для этих моделей. Попробуйте создать НОВЫЙ ключ в Google AI Studio.")
+            st.error(f"❌ СБОЙ: {str(e)}")
